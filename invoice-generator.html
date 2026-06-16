@@ -1,0 +1,1528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InvoiceForge Pro – Professional Invoice Generator</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  :root {
+    --ink:       #0f0f0f;
+    --paper:     #fafaf7;
+    --card:      #ffffff;
+    --muted:     #6b6b6b;
+    --border:    #e2e2dc;
+    --accent:    #2563eb;
+    --accent-lt: #eff4ff;
+    --red:       #dc2626;
+    --green:     #16a34a;
+    --amber:     #d97706;
+    --shadow:    0 1px 3px rgba(0,0,0,.07), 0 4px 16px rgba(0,0,0,.05);
+    --radius:    10px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* ── TOP NAV ── */
+  .topbar {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    font-family: 'Instrument Serif', serif;
+    font-size: 20px;
+    letter-spacing: -.3px;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .logo-dot { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; display: inline-block; }
+  .topbar-actions { display: flex; gap: 8px; align-items: center; }
+
+  /* ── LAYOUT ── */
+  .workspace {
+    display: grid;
+    grid-template-columns: 420px 1fr;
+    gap: 0;
+    min-height: calc(100vh - 56px);
+  }
+
+  .sidebar {
+    background: var(--card);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 0;
+  }
+
+  .preview-pane {
+    background: #e8e8e4;
+    padding: 32px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* ── SIDEBAR SECTIONS ── */
+  .section {
+    border-bottom: 1px solid var(--border);
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    cursor: pointer;
+    user-select: none;
+    background: var(--card);
+    transition: background .15s;
+  }
+  .section-header:hover { background: #f8f8f5; }
+  .section-title {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .6px;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title svg { opacity: .6; }
+  .section-toggle { color: var(--muted); font-size: 16px; transition: transform .2s; }
+  .section-toggle.open { transform: rotate(180deg); }
+  .section-body { padding: 0 20px 18px; display: none; }
+  .section-body.open { display: block; }
+
+  /* ── FORM CONTROLS ── */
+  .form-row { margin-bottom: 12px; }
+  .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  label {
+    display: block;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--muted);
+    margin-bottom: 4px;
+    letter-spacing: .2px;
+  }
+  input[type="text"], input[type="number"], input[type="date"], input[type="email"],
+  textarea, select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13.5px;
+    color: var(--ink);
+    background: var(--paper);
+    transition: border-color .15s, box-shadow .15s;
+    outline: none;
+  }
+  input:focus, textarea:focus, select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-lt);
+    background: #fff;
+  }
+  textarea { resize: vertical; min-height: 68px; }
+  select { cursor: pointer; }
+
+  /* ── BUTTONS ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all .15s;
+    white-space: nowrap;
+  }
+  .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-primary:hover { background: #1d4ed8; border-color: #1d4ed8; }
+  .btn-outline { background: transparent; color: var(--ink); border-color: var(--border); }
+  .btn-outline:hover { background: var(--paper); border-color: #bbb; }
+  .btn-ghost { background: transparent; color: var(--muted); border-color: transparent; padding: 6px 10px; }
+  .btn-ghost:hover { background: var(--paper); color: var(--ink); }
+  .btn-danger { background: #fef2f2; color: var(--red); border-color: #fecaca; }
+  .btn-danger:hover { background: #fee2e2; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn-lg { padding: 10px 20px; font-size: 14px; }
+
+  /* ── LOGO UPLOAD ── */
+  .logo-upload-area {
+    border: 1.5px dashed var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    margin-bottom: 12px;
+  }
+  .logo-upload-area:hover { border-color: var(--accent); background: var(--accent-lt); }
+  .logo-upload-area img { max-height: 60px; max-width: 100%; object-fit: contain; }
+  .logo-upload-text { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  #logoInput { display: none; }
+
+  /* ── COLOR PICKER STRIP ── */
+  .color-strip { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .color-swatch {
+    width: 26px; height: 26px; border-radius: 50%;
+    cursor: pointer; border: 2px solid transparent;
+    transition: transform .15s, border-color .15s;
+  }
+  .color-swatch:hover, .color-swatch.active { border-color: var(--ink); transform: scale(1.15); }
+  .color-custom { display: flex; align-items: center; }
+  input[type="color"] { width: 28px; height: 28px; border: none; background: none; cursor: pointer; border-radius: 50%; padding: 0; }
+
+  /* ── ITEMS TABLE (SIDEBAR) ── */
+  .items-list { margin-top: 4px; }
+  .item-card {
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 8px;
+    position: relative;
+  }
+  .item-card-top { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start; }
+  .item-card-bottom { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 8px; }
+  .item-delete { color: var(--red); opacity: .7; cursor: pointer; font-size: 16px; line-height: 1; padding: 2px; }
+  .item-delete:hover { opacity: 1; }
+  .add-item-btn { width: 100%; margin-top: 4px; justify-content: center; border-style: dashed; }
+
+  /* ── TAX / DISCOUNT ROWS ── */
+  .fee-row {
+    display: grid;
+    grid-template-columns: 1fr 80px 28px;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .fee-delete { color: var(--muted); cursor: pointer; font-size: 16px; text-align: center; }
+  .fee-delete:hover { color: var(--red); }
+
+  /* ── TOGGLE SWITCH ── */
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .toggle-label { font-size: 13px; color: var(--ink); }
+  .toggle { position: relative; display: inline-block; width: 36px; height: 20px; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute; cursor: pointer; inset: 0;
+    background: #d1d5db; border-radius: 20px;
+    transition: background .2s;
+  }
+  .toggle-slider::before {
+    content: ''; position: absolute;
+    width: 14px; height: 14px;
+    left: 3px; top: 3px;
+    background: #fff; border-radius: 50%;
+    transition: transform .2s;
+  }
+  .toggle input:checked + .toggle-slider { background: var(--accent); }
+  .toggle input:checked + .toggle-slider::before { transform: translateX(16px); }
+
+  /* ── INVOICE PREVIEW ── */
+  .invoice-paper {
+    background: #fff;
+    width: 720px;
+    max-width: 100%;
+    min-height: 960px;
+    border-radius: 4px;
+    box-shadow: 0 4px 40px rgba(0,0,0,.15);
+    padding: 56px;
+    font-family: 'DM Sans', sans-serif;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .inv-accent-bar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 5px;
+    background: var(--accent);
+  }
+
+  /* Invoice Header */
+  .inv-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 40px;
+  }
+  .inv-logo-area img { max-height: 72px; max-width: 200px; object-fit: contain; }
+  .inv-logo-text {
+    font-family: 'Instrument Serif', serif;
+    font-size: 26px;
+    color: var(--ink);
+  }
+  .inv-title-block { text-align: right; }
+  .inv-title {
+    font-family: 'Instrument Serif', serif;
+    font-size: 36px;
+    color: var(--ink);
+    letter-spacing: -.5px;
+    line-height: 1;
+  }
+  .inv-number {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .inv-status-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    margin-top: 8px;
+  }
+  .badge-draft    { background: #f3f4f6; color: #6b7280; }
+  .badge-sent     { background: #eff6ff; color: #2563eb; }
+  .badge-paid     { background: #f0fdf4; color: #16a34a; }
+  .badge-overdue  { background: #fef2f2; color: #dc2626; }
+
+  /* From / To */
+  .inv-parties {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    margin-bottom: 36px;
+  }
+  .inv-party-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .8px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .inv-party-name { font-size: 15px; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+  .inv-party-detail { font-size: 13px; color: var(--muted); line-height: 1.7; }
+
+  /* Dates row */
+  .inv-meta {
+    display: flex;
+    gap: 32px;
+    padding: 14px 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 28px;
+  }
+  .inv-meta-item { }
+  .inv-meta-label { font-size: 10px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); }
+  .inv-meta-value { font-size: 14px; font-weight: 500; color: var(--ink); margin-top: 2px; }
+
+  /* Line Items */
+  .inv-items { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+  .inv-items thead th {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .6px;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1.5px solid var(--border);
+  }
+  .inv-items thead th:last-child,
+  .inv-items thead th:nth-child(3),
+  .inv-items thead th:nth-child(4) { text-align: right; }
+  .inv-items tbody tr { border-bottom: 1px solid #f0f0ec; }
+  .inv-items tbody tr:last-child { border-bottom: none; }
+  .inv-items tbody td { padding: 10px 10px; font-size: 13.5px; vertical-align: top; }
+  .inv-items tbody td:nth-child(3),
+  .inv-items tbody td:nth-child(4),
+  .inv-items tbody td:last-child { text-align: right; }
+  .inv-item-desc { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .inv-items .row-alt { background: #fafaf7; }
+
+  /* Totals */
+  .inv-totals {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    margin-bottom: 32px;
+  }
+  .inv-totals-inner { width: 280px; }
+  .inv-totals-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+    font-size: 13.5px;
+    color: var(--muted);
+  }
+  .inv-totals-row.subtotal-row { border-top: 1px solid var(--border); padding-top: 8px; }
+  .inv-totals-row.total-row {
+    border-top: 2px solid var(--ink);
+    margin-top: 4px;
+    padding-top: 10px;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .inv-totals-row.total-row .total-amount { font-family: 'Instrument Serif', serif; font-size: 22px; }
+  .inv-totals-row .row-label { }
+  .inv-totals-row .row-value { font-family: 'DM Mono', monospace; font-size: 13px; }
+  .inv-totals-row.total-row .row-value { font-family: 'Instrument Serif', serif; font-size: 20px; }
+
+  /* Footer */
+  .inv-footer {
+    margin-top: auto;
+    padding-top: 28px;
+    border-top: 1px solid var(--border);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  .inv-footer-label { font-size: 10px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .inv-footer-value { font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+  .inv-footer-value.mono { font-family: 'DM Mono', monospace; font-size: 12px; }
+
+  /* Watermark */
+  .inv-watermark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-30deg);
+    font-family: 'Instrument Serif', serif;
+    font-size: 80px;
+    font-style: italic;
+    opacity: .04;
+    color: var(--ink);
+    pointer-events: none;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  /* ── PREVIEW TOOLBAR ── */
+  .preview-toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  /* ── CURRENCY TAG ── */
+  .currency-flag {
+    font-size: 16px;
+    vertical-align: middle;
+    margin-right: 4px;
+  }
+
+  /* ── TEMPLATE SELECTOR ── */
+  .template-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+  .template-thumb {
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 6px;
+    text-align: center;
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--muted);
+    transition: all .15s;
+  }
+  .template-thumb:hover, .template-thumb.active { border-color: var(--accent); color: var(--accent); background: var(--accent-lt); }
+  .template-thumb-preview {
+    height: 44px;
+    border-radius: 3px;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+  }
+
+  /* ── MOBILE ── */
+  @media (max-width: 900px) {
+    .workspace { grid-template-columns: 1fr; }
+    .preview-pane { padding: 16px; }
+    .invoice-paper { padding: 24px; width: 100%; min-height: auto; }
+    .inv-header { flex-direction: column; gap: 16px; }
+    .inv-title-block { text-align: left; }
+    .inv-parties { grid-template-columns: 1fr; gap: 16px; }
+    .inv-footer { grid-template-columns: 1fr; }
+    .inv-meta { flex-wrap: wrap; gap: 16px; }
+    .form-row-2 { grid-template-columns: 1fr; }
+    .topbar-actions .btn span { display: none; }
+  }
+  @media (max-width: 600px) {
+    .template-grid { grid-template-columns: repeat(3, 1fr); }
+    .inv-items { font-size: 12px; }
+    .inv-title { font-size: 28px; }
+  }
+
+  /* ── NOTIFICATIONS ── */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--ink); color: #fff;
+    padding: 12px 18px; border-radius: 8px;
+    font-size: 13px; font-weight: 500;
+    box-shadow: 0 8px 32px rgba(0,0,0,.2);
+    opacity: 0; transform: translateY(8px);
+    transition: all .25s; z-index: 999;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.success { background: #166534; }
+  .toast.error { background: #991b1b; }
+
+  /* ── LOADING ── */
+  .loading-overlay {
+    position: fixed; inset: 0; background: rgba(255,255,255,.85);
+    display: none; align-items: center; justify-content: center;
+    z-index: 999; backdrop-filter: blur(4px);
+  }
+  .loading-overlay.show { display: flex; }
+  .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── PAYMENT INFO STYLES ── */
+  .inv-payment-box {
+    background: var(--accent-lt);
+    border: 1px solid #bfdbfe;
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin-bottom: 24px;
+  }
+  .inv-payment-title { font-size: 11px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+  .inv-payment-detail { font-size: 13px; color: var(--ink); line-height: 1.8; font-family: 'DM Mono', monospace; }
+
+  /* ── SIGNATURE AREA ── */
+  .inv-signature { margin-top: 32px; padding-top: 16px; }
+  .inv-sig-line { border-top: 1.5px solid var(--ink); width: 180px; margin-bottom: 4px; }
+  .inv-sig-label { font-size: 11px; color: var(--muted); letter-spacing: .3px; }
+
+  /* Scrollbar */
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-track { background: transparent; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .tag-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; background: var(--paper); border: 1px solid var(--border); border-radius: 20px; font-size: 11.5px; color: var(--muted); cursor: pointer; transition: all .15s; }
+  .tag:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-lt); }
+
+  .help-text { font-size: 11px; color: var(--muted); margin-top: 3px; }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<nav class="topbar">
+  <div class="logo">
+    <span class="logo-dot"></span>
+    InvoiceForge Pro
+  </div>
+  <div class="topbar-actions">
+    <button class="btn btn-outline btn-sm" onclick="resetForm()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.96"/></svg>
+      <span>Reset</span>
+    </button>
+    <button class="btn btn-outline btn-sm" onclick="saveDraft()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      <span>Save Draft</span>
+    </button>
+    <button class="btn btn-primary btn-sm" onclick="downloadPDF()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <span>Download PDF</span>
+    </button>
+  </div>
+</nav>
+
+<div class="workspace">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+
+    <!-- TEMPLATE -->
+    <div class="section">
+      <div class="section-header" onclick="toggleSection(this)">
+        <span class="section-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          Template & Style
+        </span>
+        <span class="section-toggle open">▾</span>
+      </div>
+      <div class="section-body open">
+        <div class="template-grid">
+          <div class="template-thumb active" onclick="selectTemplate('classic', this)">
+            <div class="template-thumb-preview" style="background:#f0f4ff;">📄</div>
+            Classic
+          </div>
+          <div class="template-thumb" onclick="selectTemplate('minimal', this)">
+            <div class="template-thumb-preview" style="background:#f5f5f3;">⬜</div>
+            Minimal
+          </div>
+          <div class="template-thumb" onclick="selectTemplate('bold', this)">
+            <div class="template-thumb-preview" style="background:#1e1e1e;">🟦</div>
+            Bold
+          </div>
+        </div>
+        <div style="margin-top:12px;">
+          <label>Accent Color</label>
+          <div class="color-strip">
+            <div class="color-swatch active" style="background:#2563eb;" onclick="setAccent('#2563eb',this)" title="Blue"></div>
+            <div class="color-swatch" style="background:#7c3aed;" onclick="setAccent('#7c3aed',this)" title="Purple"></div>
+            <div class="color-swatch" style="background:#dc2626;" onclick="setAccent('#dc2626',this)" title="Red"></div>
+            <div class="color-swatch" style="background:#16a34a;" onclick="setAccent('#16a34a',this)" title="Green"></div>
+            <div class="color-swatch" style="background:#d97706;" onclick="setAccent('#d97706',this)" title="Amber"></div>
+            <div class="color-swatch" style="background:#0f172a;" onclick="setAccent('#0f172a',this)" title="Dark"></div>
+            <div class="color-swatch" style="background:#db2777;" onclick="setAccent('#db2777',this)" title="Pink"></div>
+            <div class="color-custom">
+              <input type="color" id="customColor" value="#2563eb" onchange="setAccent(this.value, null)" title="Custom Color">
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:12px;" class="form-row">
+          <label>Invoice Status</label>
+          <select id="invoiceStatus" onchange="updatePreview()">
+            <option value="draft">Draft</option>
+            <option value="sent">Sent</option>
+            <option value="paid">Paid</option>
+            <option value="overdue">Overdue</option>
+          </select>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Show Watermark</span>
+          <label class="toggle"><input type="checkbox" id="showWatermark" onchange="updatePreview()"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Show Accent Bar</span>
+          <label class="toggle"><input type="checkbox" id="showAccentBar" checked onchange="updatePreview()"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+    </div>
+
+    <!-- BRAND / YOUR INFO -->
+    <div class="section">
+      <div class="section-header" onclick="toggleSection(this)">
+        <span class="section-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
+          Your Business
+        </span>
+        <span class="section-toggle open">▾</span>
+      </div>
+      <div class="section-body open">
+        <div class="logo-upload-area" onclick="document.getElementById('logoInput').click()">
+          <div id="logoPreviewArea">
+            <div style="font-size:28px;">🏢</div>
+            <div class="logo-upload-text">Click to upload logo (PNG, JPG, SVG)</div>
+          </div>
+        </div>
+        <input type="file" id="logoInput" accept="image/*" onchange="handleLogoUpload(event)">
+        <div class="form-row">
+          <label>Business Name *</label>
+          <input type="text" id="fromName" placeholder="Acme Corp" oninput="updatePreview()">
+        </div>
+        <div class="form-row">
+          <label>Address</label>
+          <textarea id="fromAddress" rows="2" placeholder="123 Main St, City, State 10001" oninput="updatePreview()"></textarea>
+        </div>
+        <div class="form-row-2">
+          <div>
+            <label>Email</label>
+            <input type="email" id="fromEmail" placeholder="hello@acme.com" oninput="updatePreview()">
+          </div>
+          <div>
+            <label>Phone</label>
+            <input type="text" id="fromPhone" placeholder="+91 98765 43210" oninput="updatePreview()">
+          </div>
+        </div>
+        <div class="form-row">
+          <label>GST / Tax ID / PAN</label>
+          <input type="text" id="fromTaxId" placeholder="22AAAAA0000A1Z5" oninput="updatePreview()">
+        </div>
+        <div class="form-row">
+          <label>Website</label>
+          <input type="text" id="fromWebsite" placeholder="www.acme.com" oninput="updatePreview()">
+        </div>
+      </div>
+    </div>
+
+    <!-- CLIENT INFO -->
+    <div class="section">
+      <div class="section-header" onclick="toggleSection(this)">
+        <span class="section-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Bill To (Client)
+        </span>
+        <span class="section-toggle open">▾</span>
+      </div>
+      <div class="section-body open">
+        <div class="form-row">
+          <label>Client / Company Name *</label>
+          <input type="text" id="toName" placeholder="Client Name" oninput="updatePreview()">
+        </div>
+        <div class="form-row">
+          <label>Address</label>
+          <textarea id="toAddress" rows="2" placeholder="456 Client Ave, City, State" oninput="updatePreview()"></textarea>
+        </div>
+        <div class="form-row-2">
+          <div>
+            <label>Email</label>
+            <input type="email" id="toEmail" placeholder="client@email.com" oninput="updatePreview()">
+          </div>
+          <div>
+            <label>Phone</label>
+            <input type="text" id="toPhone" placeholder="+91 99999 00000" oninput="updatePreview()">
+          </div>
+        </div>
+        <div class="form-row">
+          <label>GST / Tax ID</label>
+          <input type="text" id="toTaxId" placeholder="Client GSTIN" oninput="updatePreview()">
+        </div>
+      </div>
+    </div>
+
+    <!-- INVOICE DETAILS -->
+    <div class="section">
+      <div class="section-header" onclick="toggleSection(this)">
+        <span class="section-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          Invoice Details
+        </span>
+        <span class="section-toggle open">▾</span>
+      </div>
+      <div class="section-body open">
+        <div class="form-row-2">
+          <div>
+            <label>Invoice No. *</label>
+            <input type="text" id="invoiceNo" placeholder="INV-001" oninput="updatePreview()">
+          </div>
+          <div>
+            <label>PO Number</label>
+            <input type="text" id="poNumber" placeholder="PO-2024" oninput="updatePreview()">
+          </div>
+        </div>
+        <div class="form-row-2">
+          <div>
+            <label>Invoice Date *</label>
+            <input type="date" id="invoiceDate" oninput="updatePreview()">
+          </div>
+          <div>
+            <label>Due Date *</label>
+            <input type="date" id="dueDate" oninput="updatePreview()">
+          </div>
+        </div>
+        <div class="form-row">
+          <label>Currency</label>
+          <select id="currency" onchange="updatePreview()">
+            <option value="₹">🇮🇳 INR (₹)</option>
+            <option value="$">🇺🇸 USD ($)</option>
+            <option value="€">🇪🇺 EUR (€)</option>
+            <option value="£">🇬🇧 GBP (£)</option>
+            <option value="¥">🇯🇵 JPY (¥)</option>
+            <option value="A$">🇦🇺 AUD (A$)</option>
+            <option value="C$">🇨🇦 CAD (C$)</option>
+            <option value="AED">🇦🇪 AED</option>
+            <option value="SGD">🇸🇬 SGD</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Payment Terms</label>
+          <div class="tag-row">
+            <span class="tag" onclick="setPaymentTerms('Due on receipt')">Due on receipt</span>
+            <span class="tag" onclick="setPaymentTerms('Net 15')">Net 15</span>
+            <span class="tag" onclick="setPaymentTerms('Net 30')">Net 30</span>
+            <span class="tag" onclick="setPaymentTerms('Net 60')">Net 60</span>
+          </div>
+          <input type="text" id="paymentTerms" placeholder="e.g. Net 30" oninput="updatePreview()" style="margin-top:6px;">
+        </div>
+      </div>
+    </div>
+
+    <!-- LINE ITEMS -->
+    <div class="section">
+      <div class="section-header" onclick="toggleSection(this)">
+        <span class="section-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Line Items
+        </span>
+        <span class="section-toggle open">▾</span>
+      </div>
+      <div class="section-body open">
+        <div class="items-list" id="itemsList"></div>
+        <button class="btn btn-outline add-item-btn" onclick="addItem()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Item / Service
+        </button>
+      </div>
+    </div>
+
+    <!-- TAXES & DISCOUNTS -->
+    <div class="section">
+      <div class="section-header" onclick="toggleSection(this)">
+        <span class="section-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+          Tax & Discount
+        </span>
+        <span class="section-toggle open">▾</span>
+      </div>
+      <div class="section-body open">
+        <div id="taxList"></div>
+        <button class="btn btn-ghost btn-sm" onclick="addTax()" style="margin-bottom:8px;">
+          + Add Tax
+        </button>
+        <div id="discountList"></div>
+        <button class="btn btn-ghost btn-sm" onclick="addDiscount()">
+          + Add Discount
+        </button>
+        <div style="margin-top:12px;" class="toggle-row">
+          <span class="toggle-label">Show Shipping</span>
+          <label class="toggle"><input type="checkbox" id="showShipping" onchange="updatePreview()"><span class="toggle-slider"></span></label>
+        </div>
+        <div id="shippingRow" style="display:none;">
+          <label>Shipping Amount</label>
+          <input type="number" id="shippingAmount" value="0" min="0" step="0.01" oninput="updatePreview()">
+        </div>
+      </div>
+    </div>
+
+    <!-- PAYMENT INFO -->
+    <div class="section">
+      <div class="section-header" onclick="toggleSection(this)">
+        <span class="section-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          Payment Information
+        </span>
+        <span class="section-toggle">▾</span>
+      </div>
+      <div class="section-body">
+        <div class="toggle-row">
+          <span class="toggle-label">Show Payment Details</span>
+          <label class="toggle"><input type="checkbox" id="showPaymentInfo" onchange="updatePreview()"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="form-row">
+          <label>Bank Name</label>
+          <input type="text" id="bankName" placeholder="State Bank of India" oninput="updatePreview()">
+        </div>
+        <div class="form-row">
+          <label>Account Number</label>
+          <input type="text" id="accountNo" placeholder="XXXXXXXXXXXXXXXX" oninput="updatePreview()">
+        </div>
+        <div class="form-row-2">
+          <div>
+            <label>IFSC / SWIFT</label>
+            <input type="text" id="ifscCode" placeholder="SBIN0001234" oninput="updatePreview()">
+          </div>
+          <div>
+            <label>UPI ID</label>
+            <input type="text" id="upiId" placeholder="name@upi" oninput="updatePreview()">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- NOTES & TERMS -->
+    <div class="section">
+      <div class="section-header" onclick="toggleSection(this)">
+        <span class="section-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          Notes & Terms
+        </span>
+        <span class="section-toggle">▾</span>
+      </div>
+      <div class="section-body">
+        <div class="form-row">
+          <label>Notes to Client</label>
+          <textarea id="invoiceNotes" placeholder="Thank you for your business! Payment is due within the specified terms." oninput="updatePreview()"></textarea>
+        </div>
+        <div class="form-row">
+          <label>Terms & Conditions</label>
+          <textarea id="invoiceTerms" placeholder="Late payments are subject to 1.5% monthly interest. Goods remain property of seller until paid in full." oninput="updatePreview()"></textarea>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">Show Signature Line</span>
+          <label class="toggle"><input type="checkbox" id="showSignature" onchange="updatePreview()"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- PREVIEW PANE -->
+  <main class="preview-pane">
+    <div class="preview-toolbar">
+      <button class="btn btn-outline btn-sm" onclick="printInvoice()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Print
+      </button>
+      <button class="btn btn-outline btn-sm" onclick="copyShareLink()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+        Share Link
+      </button>
+      <button class="btn btn-primary btn-sm" onclick="downloadPDF()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download PDF
+      </button>
+    </div>
+
+    <!-- LIVE INVOICE PREVIEW -->
+    <div id="invoicePreview" class="invoice-paper">
+      <!-- rendered by JS -->
+    </div>
+  </main>
+</div>
+
+<!-- LOADING -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div style="text-align:center;">
+    <div class="spinner"></div>
+    <div style="margin-top:12px;font-size:13px;color:var(--muted);">Generating PDF…</div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── STATE ──
+let state = {
+  accentColor: '#2563eb',
+  template: 'classic',
+  logoSrc: null,
+  items: [],
+  taxes: [],
+  discounts: [],
+  currency: '₹'
+};
+
+// ── INIT ──
+document.addEventListener('DOMContentLoaded', () => {
+  // Set today + 30 days
+  const today = new Date();
+  document.getElementById('invoiceDate').value = fmt(today);
+  const due = new Date(today); due.setDate(due.getDate() + 30);
+  document.getElementById('dueDate').value = fmt(due);
+
+  // Invoice number
+  document.getElementById('invoiceNo').value = 'INV-' + String(Math.floor(Math.random()*900)+100);
+
+  // Add 2 default items
+  addItem('Web Design Services', 'Homepage + 5 inner pages', 1, 25000);
+  addItem('Monthly Maintenance', 'Bug fixes and updates', 1, 5000);
+
+  // Add default GST
+  addTaxEntry('GST 18%', 18);
+
+  // Load draft if exists
+  loadDraft();
+  updatePreview();
+});
+
+function fmt(d) {
+  return d.toISOString().split('T')[0];
+}
+
+// ── SECTIONS ──
+function toggleSection(header) {
+  const body = header.nextElementSibling;
+  const toggle = header.querySelector('.section-toggle');
+  body.classList.toggle('open');
+  toggle.classList.toggle('open');
+}
+
+// ── LOGO ──
+function handleLogoUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    state.logoSrc = ev.target.result;
+    document.getElementById('logoPreviewArea').innerHTML = `<img src="${state.logoSrc}" style="max-height:60px;max-width:200px;object-fit:contain;">`;
+    updatePreview();
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── COLOR ──
+function setAccent(color, el) {
+  state.accentColor = color;
+  document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+  if (el) el.classList.add('active');
+  document.getElementById('customColor').value = color;
+  document.documentElement.style.setProperty('--accent', color);
+  // Compute light version
+  document.documentElement.style.setProperty('--accent-lt', color + '18');
+  updatePreview();
+}
+
+// ── TEMPLATE ──
+function selectTemplate(t, el) {
+  state.template = t;
+  document.querySelectorAll('.template-thumb').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+  updatePreview();
+}
+
+// ── ITEMS ──
+function addItem(name='', desc='', qty=1, rate=0) {
+  const id = Date.now() + Math.random();
+  state.items.push({ id, name, desc, qty, rate });
+  renderItems();
+  updatePreview();
+}
+
+function removeItem(id) {
+  state.items = state.items.filter(i => i.id !== id);
+  renderItems();
+  updatePreview();
+}
+
+function renderItems() {
+  const container = document.getElementById('itemsList');
+  container.innerHTML = '';
+  state.items.forEach((item, idx) => {
+    const card = document.createElement('div');
+    card.className = 'item-card';
+    card.innerHTML = `
+      <div class="item-card-top">
+        <input type="text" placeholder="Item / Service name" value="${esc(item.name)}"
+          oninput="updateItem(${item.id},'name',this.value)" style="font-weight:500;">
+        <span class="item-delete" onclick="removeItem(${item.id})" title="Remove">✕</span>
+      </div>
+      <div class="form-row" style="margin-top:6px;margin-bottom:0;">
+        <input type="text" placeholder="Description (optional)" value="${esc(item.desc)}"
+          oninput="updateItem(${item.id},'desc',this.value)" style="font-size:12px;color:var(--muted);">
+      </div>
+      <div class="item-card-bottom">
+        <div>
+          <label>Qty</label>
+          <input type="number" value="${item.qty}" min="0" step="0.01" oninput="updateItem(${item.id},'qty',this.value)">
+        </div>
+        <div>
+          <label>Rate</label>
+          <input type="number" value="${item.rate}" min="0" step="0.01" oninput="updateItem(${item.id},'rate',this.value)">
+        </div>
+        <div>
+          <label>Amount</label>
+          <input type="text" value="${fmtNum(item.qty * item.rate)}" readonly style="background:#f5f5f3;color:var(--muted);cursor:default;">
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function updateItem(id, field, val) {
+  const item = state.items.find(i => i.id === id);
+  if (!item) return;
+  if (field === 'qty' || field === 'rate') item[field] = parseFloat(val) || 0;
+  else item[field] = val;
+  // Update amount display
+  renderItems();
+  updatePreview();
+}
+
+// ── TAXES ──
+function addTax() { addTaxEntry('', 0); }
+function addTaxEntry(name='', rate=0) {
+  const id = Date.now() + Math.random();
+  state.taxes.push({ id, name, rate });
+  renderTaxes();
+  updatePreview();
+}
+
+function renderTaxes() {
+  const c = document.getElementById('taxList');
+  c.innerHTML = '';
+  state.taxes.forEach(t => {
+    const row = document.createElement('div');
+    row.className = 'fee-row';
+    row.innerHTML = `
+      <input type="text" placeholder="Tax name (e.g. GST 18%)" value="${esc(t.name)}" oninput="updateFee('tax',${t.id},'name',this.value)">
+      <input type="number" placeholder="%" value="${t.rate}" min="0" step="0.1" oninput="updateFee('tax',${t.id},'rate',this.value)">
+      <span class="fee-delete" onclick="removeFee('tax',${t.id})">✕</span>
+    `;
+    c.appendChild(row);
+  });
+}
+
+// ── DISCOUNTS ──
+function addDiscount() {
+  const id = Date.now() + Math.random();
+  state.discounts.push({ id, name: '', rate: 0 });
+  renderDiscounts();
+  updatePreview();
+}
+
+function renderDiscounts() {
+  const c = document.getElementById('discountList');
+  c.innerHTML = '';
+  state.discounts.forEach(d => {
+    const row = document.createElement('div');
+    row.className = 'fee-row';
+    row.innerHTML = `
+      <input type="text" placeholder="Discount name" value="${esc(d.name)}" oninput="updateFee('discount',${d.id},'name',this.value)">
+      <input type="number" placeholder="%" value="${d.rate}" min="0" step="0.1" oninput="updateFee('discount',${d.id},'rate',this.value)">
+      <span class="fee-delete" onclick="removeFee('discount',${d.id})">✕</span>
+    `;
+    c.appendChild(row);
+  });
+}
+
+function updateFee(type, id, field, val) {
+  const arr = type === 'tax' ? state.taxes : state.discounts;
+  const item = arr.find(i => i.id === id);
+  if (!item) return;
+  item[field] = field === 'rate' ? parseFloat(val)||0 : val;
+  updatePreview();
+}
+
+function removeFee(type, id) {
+  if (type === 'tax') state.taxes = state.taxes.filter(i => i.id !== id);
+  else state.discounts = state.discounts.filter(i => i.id !== id);
+  if (type === 'tax') renderTaxes(); else renderDiscounts();
+  updatePreview();
+}
+
+// ── SHIPPING TOGGLE ──
+document.getElementById('showShipping').addEventListener('change', function() {
+  document.getElementById('shippingRow').style.display = this.checked ? 'block' : 'none';
+  updatePreview();
+});
+
+// ── PAYMENT TERMS QUICK TAGS ──
+function setPaymentTerms(v) {
+  document.getElementById('paymentTerms').value = v;
+  updatePreview();
+}
+
+// ── CALCULATIONS ──
+function calcTotals() {
+  const subtotal = state.items.reduce((s, i) => s + (i.qty * i.rate), 0);
+  const totalDiscount = state.discounts.reduce((s, d) => s + (subtotal * d.rate / 100), 0);
+  const afterDiscount = subtotal - totalDiscount;
+  const totalTax = state.taxes.reduce((s, t) => s + (afterDiscount * t.rate / 100), 0);
+  const shipping = document.getElementById('showShipping').checked ? (parseFloat(document.getElementById('shippingAmount').value)||0) : 0;
+  const total = afterDiscount + totalTax + shipping;
+  return { subtotal, totalDiscount, afterDiscount, totalTax, shipping, total };
+}
+
+// ── CURRENCY ──
+function getCurrency() {
+  return document.getElementById('currency').value;
+}
+
+function fmtNum(n) {
+  return Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtCurrency(n) {
+  return getCurrency() + ' ' + fmtNum(n);
+}
+
+// ── GET FIELD ──
+function g(id) { return (document.getElementById(id)||{}).value || ''; }
+
+// ── ESCAPE ──
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── STATUS BADGE ──
+function statusBadge(s) {
+  const labels = { draft:'Draft', sent:'Sent', paid:'Paid', overdue:'Overdue' };
+  return `<span class="inv-status-badge badge-${s}">${labels[s]||s}</span>`;
+}
+
+// ── MAIN RENDER ──
+function updatePreview() {
+  const totals = calcTotals();
+  const status = g('invoiceStatus') || 'draft';
+  const showWatermark = document.getElementById('showWatermark').checked;
+  const showAccentBar = document.getElementById('showAccentBar').checked;
+  const showPayment = document.getElementById('showPaymentInfo').checked;
+  const showSig = document.getElementById('showSignature').checked;
+  const currency = getCurrency();
+
+  // Items rows
+  const itemRows = state.items.map((item, i) => `
+    <tr${i%2===1?' class="row-alt"':''}>
+      <td>
+        <div style="font-weight:500;">${esc(item.name)||'—'}</div>
+        ${item.desc ? `<div class="inv-item-desc">${esc(item.desc)}</div>` : ''}
+      </td>
+      <td>${fmtNum(item.qty)}</td>
+      <td>${fmtNum(item.rate)}</td>
+      <td>${fmtNum(item.qty * item.rate)}</td>
+    </tr>
+  `).join('');
+
+  // Discount rows
+  const discountRows = state.discounts.map(d => `
+    <div class="inv-totals-row" style="color:var(--green);">
+      <span class="row-label">${esc(d.name)||'Discount'} (${d.rate}%)</span>
+      <span class="row-value" style="font-family:'DM Mono',monospace;">- ${currency} ${fmtNum(totals.subtotal * d.rate / 100)}</span>
+    </div>
+  `).join('');
+
+  // Tax rows
+  const taxRows = state.taxes.map(t => `
+    <div class="inv-totals-row">
+      <span class="row-label">${esc(t.name)||'Tax'} (${t.rate}%)</span>
+      <span class="row-value" style="font-family:'DM Mono',monospace;">${currency} ${fmtNum(totals.afterDiscount * t.rate / 100)}</span>
+    </div>
+  `).join('');
+
+  // Shipping row
+  const shippingRow = document.getElementById('showShipping').checked && totals.shipping > 0 ? `
+    <div class="inv-totals-row">
+      <span class="row-label">Shipping</span>
+      <span class="row-value" style="font-family:'DM Mono',monospace;">${currency} ${fmtNum(totals.shipping)}</span>
+    </div>
+  ` : '';
+
+  // Payment info
+  const paymentBlock = showPayment ? `
+    <div class="inv-payment-box">
+      <div class="inv-payment-title">Payment Information</div>
+      <div class="inv-payment-detail">
+        ${g('bankName') ? `Bank: ${g('bankName')}<br>` : ''}
+        ${g('accountNo') ? `Account: ${g('accountNo')}<br>` : ''}
+        ${g('ifscCode') ? `IFSC / SWIFT: ${g('ifscCode')}<br>` : ''}
+        ${g('upiId') ? `UPI: ${g('upiId')}` : ''}
+      </div>
+    </div>
+  ` : '';
+
+  // Signature
+  const signatureBlock = showSig ? `
+    <div class="inv-signature">
+      <div class="inv-sig-line"></div>
+      <div class="inv-sig-label">Authorised Signature</div>
+    </div>
+  ` : '';
+
+  // Logo
+  const logoBlock = state.logoSrc
+    ? `<img src="${state.logoSrc}" style="max-height:72px;max-width:200px;object-fit:contain;">`
+    : `<div class="inv-logo-text" style="font-family:'Instrument Serif',serif;font-size:22px;font-weight:400;">${esc(g('fromName'))||'Your Business'}</div>`;
+
+  // Template-based styles
+  let paperStyle = '';
+  let headerStyle = '';
+  if (state.template === 'bold') {
+    paperStyle = 'background:#0f172a;color:#f1f5f9;';
+    headerStyle = '';
+  } else if (state.template === 'minimal') {
+    paperStyle = 'background:#ffffff;';
+  }
+
+  const accentBarHtml = showAccentBar
+    ? `<div class="inv-accent-bar" style="background:${state.accentColor};"></div>`
+    : '';
+
+  const darkMode = state.template === 'bold';
+  const textColor = darkMode ? '#f1f5f9' : 'var(--ink)';
+  const mutedColor = darkMode ? '#94a3b8' : 'var(--muted)';
+  const borderColor = darkMode ? '#1e293b' : 'var(--border)';
+
+  const html = `
+    ${accentBarHtml}
+    ${showWatermark ? `<div class="inv-watermark" style="color:${darkMode?'#fff':'var(--ink)'};">${status.toUpperCase()}</div>` : ''}
+
+    <div class="inv-header">
+      <div class="inv-logo-area">${logoBlock}</div>
+      <div class="inv-title-block">
+        <div class="inv-title" style="color:${state.accentColor};">INVOICE</div>
+        <div class="inv-number" style="color:${mutedColor};">${esc(g('invoiceNo'))||'INV-001'}</div>
+        ${g('poNumber') ? `<div style="font-size:11px;color:${mutedColor};margin-top:2px;">PO: ${esc(g('poNumber'))}</div>` : ''}
+        ${statusBadge(status)}
+      </div>
+    </div>
+
+    <div class="inv-parties">
+      <div>
+        <div class="inv-party-label" style="color:${mutedColor};">From</div>
+        <div class="inv-party-name" style="color:${textColor};">${esc(g('fromName'))||'Your Business Name'}</div>
+        <div class="inv-party-detail" style="color:${mutedColor};">
+          ${g('fromAddress') ? esc(g('fromAddress')).replace(/\n/g,'<br>') + '<br>' : ''}
+          ${g('fromEmail') ? esc(g('fromEmail')) + '<br>' : ''}
+          ${g('fromPhone') ? esc(g('fromPhone')) + '<br>' : ''}
+          ${g('fromTaxId') ? 'GSTIN/Tax ID: ' + esc(g('fromTaxId')) + '<br>' : ''}
+          ${g('fromWebsite') ? esc(g('fromWebsite')) : ''}
+        </div>
+      </div>
+      <div>
+        <div class="inv-party-label" style="color:${mutedColor};">Bill To</div>
+        <div class="inv-party-name" style="color:${textColor};">${esc(g('toName'))||'Client Name'}</div>
+        <div class="inv-party-detail" style="color:${mutedColor};">
+          ${g('toAddress') ? esc(g('toAddress')).replace(/\n/g,'<br>') + '<br>' : ''}
+          ${g('toEmail') ? esc(g('toEmail')) + '<br>' : ''}
+          ${g('toPhone') ? esc(g('toPhone')) + '<br>' : ''}
+          ${g('toTaxId') ? 'GSTIN/Tax ID: ' + esc(g('toTaxId')) : ''}
+        </div>
+      </div>
+    </div>
+
+    <div class="inv-meta" style="border-color:${borderColor};">
+      <div class="inv-meta-item">
+        <div class="inv-meta-label" style="color:${mutedColor};">Invoice Date</div>
+        <div class="inv-meta-value" style="color:${textColor};">${g('invoiceDate') ? formatDate(g('invoiceDate')) : '—'}</div>
+      </div>
+      <div class="inv-meta-item">
+        <div class="inv-meta-label" style="color:${mutedColor};">Due Date</div>
+        <div class="inv-meta-value" style="color:${textColor};">${g('dueDate') ? formatDate(g('dueDate')) : '—'}</div>
+      </div>
+      ${g('paymentTerms') ? `
+      <div class="inv-meta-item">
+        <div class="inv-meta-label" style="color:${mutedColor};">Terms</div>
+        <div class="inv-meta-value" style="color:${textColor};">${esc(g('paymentTerms'))}</div>
+      </div>` : ''}
+    </div>
+
+    <table class="inv-items">
+      <thead>
+        <tr style="background:${darkMode?'#1e293b':'#fafaf7'};">
+          <th style="color:${mutedColor};">Description</th>
+          <th style="color:${mutedColor};text-align:right;">Qty</th>
+          <th style="color:${mutedColor};text-align:right;">Rate (${currency})</th>
+          <th style="color:${mutedColor};text-align:right;">Amount (${currency})</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemRows || `<tr><td colspan="4" style="text-align:center;padding:24px;color:${mutedColor};">No items added yet</td></tr>`}
+      </tbody>
+    </table>
+
+    <div class="inv-totals">
+      <div class="inv-totals-inner">
+        <div class="inv-totals-row subtotal-row" style="border-color:${borderColor};">
+          <span class="row-label" style="color:${mutedColor};">Subtotal</span>
+          <span class="row-value" style="color:${textColor};font-family:'DM Mono',monospace;">${currency} ${fmtNum(totals.subtotal)}</span>
+        </div>
+        ${discountRows}
+        ${taxRows}
+        ${shippingRow}
+        <div class="inv-totals-row total-row" style="border-color:${textColor};">
+          <span class="row-label" style="color:${textColor};">Total Due</span>
+          <span class="row-value" style="color:${state.accentColor};font-family:'Instrument Serif',serif;font-size:20px;">${currency} ${fmtNum(totals.total)}</span>
+        </div>
+      </div>
+    </div>
+
+    ${paymentBlock}
+
+    <div class="inv-footer" style="border-color:${borderColor};">
+      ${g('invoiceNotes') ? `
+      <div>
+        <div class="inv-footer-label" style="color:${mutedColor};">Notes</div>
+        <div class="inv-footer-value" style="color:${mutedColor};">${esc(g('invoiceNotes')).replace(/\n/g,'<br>')}</div>
+      </div>` : '<div></div>'}
+      ${g('invoiceTerms') ? `
+      <div>
+        <div class="inv-footer-label" style="color:${mutedColor};">Terms & Conditions</div>
+        <div class="inv-footer-value" style="color:${mutedColor};">${esc(g('invoiceTerms')).replace(/\n/g,'<br>')}</div>
+      </div>` : ''}
+    </div>
+
+    ${signatureBlock}
+  `;
+
+  const paper = document.getElementById('invoicePreview');
+  paper.innerHTML = html;
+  paper.style = paperStyle;
+}
+
+function formatDate(d) {
+  if (!d) return '';
+  const dt = new Date(d + 'T00:00:00');
+  return dt.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+}
+
+// ── PDF DOWNLOAD ──
+async function downloadPDF() {
+  document.getElementById('loadingOverlay').classList.add('show');
+  try {
+    const { jsPDF } = window.jspdf;
+    const paper = document.getElementById('invoicePreview');
+    const canvas = await html2canvas(paper, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: state.template === 'bold' ? '#0f172a' : '#ffffff'
+    });
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const w = pdf.internal.pageSize.getWidth();
+    const h = (canvas.height * w) / canvas.width;
+    pdf.addImage(imgData, 'PNG', 0, 0, w, h);
+    const fname = `Invoice_${g('invoiceNo')||'Draft'}_${g('toName')||'Client'}.pdf`.replace(/\s+/g,'-');
+    pdf.save(fname);
+    showToast('PDF downloaded!', 'success');
+  } catch(e) {
+    showToast('PDF generation failed. Try again.', 'error');
+    console.error(e);
+  } finally {
+    document.getElementById('loadingOverlay').classList.remove('show');
+  }
+}
+
+// ── PRINT ──
+function printInvoice() {
+  const content = document.getElementById('invoicePreview').outerHTML;
+  const win = window.open('', '_blank');
+  win.document.write(`
+    <html><head>
+    <title>Invoice</title>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+      body { margin: 0; padding: 20px; background: #e8e8e4; font-family: 'DM Sans', sans-serif; }
+      .invoice-paper { background: #fff; max-width: 720px; margin: 0 auto; padding: 56px; box-shadow: none; border-radius: 4px; position: relative; overflow: hidden; }
+      .inv-accent-bar { position: absolute; top: 0; left: 0; right: 0; height: 5px; }
+      .inv-watermark { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%) rotate(-30deg); font-family: 'Instrument Serif',serif; font-size: 80px; opacity: .04; pointer-events: none; white-space: nowrap; }
+      .inv-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; }
+      .inv-title { font-family: 'Instrument Serif', serif; font-size: 36px; letter-spacing: -.5px; line-height: 1; }
+      .inv-number { font-family: 'DM Mono', monospace; font-size: 13px; color: #6b6b6b; margin-top: 4px; }
+      .inv-status-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase; margin-top: 8px; }
+      .badge-draft { background: #f3f4f6; color: #6b7280; } .badge-sent { background: #eff6ff; color: #2563eb; } .badge-paid { background: #f0fdf4; color: #16a34a; } .badge-overdue { background: #fef2f2; color: #dc2626; }
+      .inv-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-bottom: 36px; }
+      .inv-party-label { font-size: 10px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; color: #6b6b6b; margin-bottom: 6px; }
+      .inv-party-name { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+      .inv-party-detail { font-size: 13px; color: #6b6b6b; line-height: 1.7; }
+      .inv-meta { display: flex; gap: 32px; padding: 14px 0; border-top: 1px solid #e2e2dc; border-bottom: 1px solid #e2e2dc; margin-bottom: 28px; }
+      .inv-meta-label { font-size: 10px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: #6b6b6b; }
+      .inv-meta-value { font-size: 14px; font-weight: 500; margin-top: 2px; }
+      .inv-items { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+      .inv-items thead th { font-size: 10px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: #6b6b6b; padding: 8px 10px; text-align: left; border-bottom: 1.5px solid #e2e2dc; }
+      .inv-items thead th:last-child, .inv-items thead th:nth-child(2), .inv-items thead th:nth-child(3), .inv-items thead th:nth-child(4) { text-align: right; }
+      .inv-items tbody tr { border-bottom: 1px solid #f0f0ec; }
+      .inv-items tbody td { padding: 10px; font-size: 13.5px; vertical-align: top; }
+      .inv-items tbody td:nth-child(2), .inv-items tbody td:nth-child(3), .inv-items tbody td:last-child { text-align: right; }
+      .inv-item-desc { font-size: 12px; color: #6b6b6b; margin-top: 2px; }
+      .row-alt { background: #fafaf7; }
+      .inv-totals { display: flex; flex-direction: column; align-items: flex-end; margin-bottom: 32px; }
+      .inv-totals-inner { width: 280px; }
+      .inv-totals-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 13.5px; color: #6b6b6b; }
+      .inv-totals-row.subtotal-row { border-top: 1px solid #e2e2dc; padding-top: 8px; }
+      .inv-totals-row.total-row { border-top: 2px solid #0f0f0f; margin-top: 4px; padding-top: 10px; font-size: 17px; font-weight: 700; color: #0f0f0f; }
+      .row-value { font-family: 'DM Mono', monospace; font-size: 13px; }
+      .inv-totals-row.total-row .row-value { font-family: 'Instrument Serif', serif; font-size: 20px; }
+      .inv-payment-box { background: #eff4ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 14px 16px; margin-bottom: 24px; }
+      .inv-payment-title { font-size: 11px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: #2563eb; margin-bottom: 8px; }
+      .inv-payment-detail { font-size: 13px; line-height: 1.8; font-family: 'DM Mono', monospace; }
+      .inv-footer { padding-top: 28px; border-top: 1px solid #e2e2dc; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+      .inv-footer-label { font-size: 10px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: #6b6b6b; margin-bottom: 4px; }
+      .inv-footer-value { font-size: 12.5px; color: #6b6b6b; line-height: 1.6; }
+      .inv-signature { margin-top: 32px; padding-top: 16px; }
+      .inv-sig-line { border-top: 1.5px solid #0f0f0f; width: 180px; margin-bottom: 4px; }
+      .inv-sig-label { font-size: 11px; color: #6b6b6b; }
+      @media print { body { background: #fff; padding: 0; } .invoice-paper { box-shadow: none; } }
+    </style>
+    </head><body>${content}</body></html>
+  `);
+  win.document.close();
+  setTimeout(() => { win.focus(); win.print(); }, 800);
+}
+
+// ── SAVE / LOAD DRAFT ──
+function saveDraft() {
+  try {
+    const fields = ['fromName','fromAddress','fromEmail','fromPhone','fromTaxId','fromWebsite',
+      'toName','toAddress','toEmail','toPhone','toTaxId',
+      'invoiceNo','poNumber','invoiceDate','dueDate','currency','paymentTerms','invoiceStatus',
+      'bankName','accountNo','ifscCode','upiId','invoiceNotes','invoiceTerms','shippingAmount'];
+    const data = {};
+    fields.forEach(id => { data[id] = g(id); });
+    data.items = state.items;
+    data.taxes = state.taxes;
+    data.discounts = state.discounts;
+    data.accentColor = state.accentColor;
+    data.template = state.template;
+    data.logoSrc = state.logoSrc;
+    data.showWatermark = document.getElementById('showWatermark').checked;
+    data.showAccentBar = document.getElementById('showAccentBar').checked;
+    data.showShipping = document.getElementById('showShipping').checked;
+    data.showPaymentInfo = document.getElementById('showPaymentInfo').checked;
+    data.showSignature = document.getElementById('showSignature').checked;
+    localStorage.setItem('invoiceforge_draft', JSON.stringify(data));
+    showToast('Draft saved!', 'success');
+  } catch(e) { showToast('Could not save draft.', 'error'); }
+}
+
+function loadDraft() {
+  try {
+    const raw = localStorage.getItem('invoiceforge_draft');
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    const fields = ['fromName','fromAddress','fromEmail','fromPhone','fromTaxId','fromWebsite',
+      'toName','toAddress','toEmail','toPhone','toTaxId',
+      'invoiceNo','poNumber','invoiceDate','dueDate','currency','paymentTerms','invoiceStatus',
+      'bankName','accountNo','ifscCode','upiId','invoiceNotes','invoiceTerms','shippingAmount'];
+    fields.forEach(id => { if (data[id] !== undefined && document.getElementById(id)) document.getElementById(id).value = data[id]; });
+    if (data.items) { state.items = data.items; renderItems(); }
+    if (data.taxes) { state.taxes = data.taxes; renderTaxes(); }
+    if (data.discounts) { state.discounts = data.discounts; renderDiscounts(); }
+    if (data.accentColor) setAccent(data.accentColor, null);
+    if (data.template) state.template = data.template;
+    if (data.logoSrc) {
+      state.logoSrc = data.logoSrc;
+      document.getElementById('logoPreviewArea').innerHTML = `<img src="${data.logoSrc}" style="max-height:60px;max-width:200px;object-fit:contain;">`;
+    }
+    ['showWatermark','showAccentBar','showPaymentInfo','showSignature'].forEach(id => {
+      if (data[id] !== undefined && document.getElementById(id)) document.getElementById(id).checked = data[id];
+    });
+    if (data.showShipping !== undefined) {
+      document.getElementById('showShipping').checked = data.showShipping;
+      document.getElementById('shippingRow').style.display = data.showShipping ? 'block' : 'none';
+    }
+    showToast('Draft restored!', 'success');
+  } catch(e) {}
+}
+
+// ── RESET ──
+function resetForm() {
+  if (!confirm('Reset all fields? This will clear your current invoice.')) return;
+  localStorage.removeItem('invoiceforge_draft');
+  location.reload();
+}
+
+// ── SHARE LINK ──
+function copyShareLink() {
+  navigator.clipboard.writeText(window.location.href).then(() => {
+    showToast('Link copied to clipboard!', 'success');
+  }).catch(() => {
+    showToast('Could not copy link.', 'error');
+  });
+}
+
+// ── TOAST ──
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => { t.className = 'toast'; }, 3000);
+}
+
+// Update preview whenever currency changes
+document.getElementById('currency').addEventListener('change', updatePreview);
+</script>
+</body>
+</html>
